@@ -1,8 +1,7 @@
 // src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
-import { auth } from '../services/firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
+import { authService } from '../services/firebase/authService';
 
 interface AuthContextData {
   user: User | null;
@@ -18,7 +17,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    console.log('🔄 Configurando listener de autenticación...');
+    
+    const unsubscribe = authService.onAuthStateChanged((user) => {
+      console.log('👤 Estado de auth cambió:', user?.email || 'sin usuario');
       setUser(user);
       setLoading(false);
     });
@@ -27,11 +29,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Implementaremos esto en el siguiente paso
+    console.log('🔐 Intentando login con:', email);
+    setLoading(true);
+    
+    try {
+      // Probar conexión primero
+      const canConnect = await authService.testFirebaseConnection();
+      console.log('🔗 Conexión Firebase:', canConnect ? 'OK' : 'FALLO');
+      
+      const user = await authService.signIn(email, password);
+      console.log('✅ Login exitoso:', user.email);
+      // El estado se actualiza automáticamente por onAuthStateChanged
+    } catch (error: any) {
+      console.error('❌ Error en login:', error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {
-    // Implementaremos esto en el siguiente paso
+    console.log('🚪 Cerrando sesión...');
+    setLoading(true);
+    
+    try {
+      await authService.signOut();
+      console.log('✅ Sesión cerrada exitosamente');
+      // El estado se actualiza automáticamente por onAuthStateChanged
+    } catch (error: any) {
+      console.error('❌ Error al cerrar sesión:', error.message);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
