@@ -33,10 +33,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     
     try {
-      // Probar conexión primero
-      const canConnect = await authService.testFirebaseConnection();
-      console.log('🔗 Conexión Firebase:', canConnect ? 'OK' : 'FALLO');
-      
       const user = await authService.signIn(email, password);
       console.log('✅ Login exitoso:', user.email);
       // El estado se actualiza automáticamente por onAuthStateChanged

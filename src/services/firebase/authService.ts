@@ -3,50 +3,60 @@ import {
   signInWithEmailAndPassword, 
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  User,
-  connectAuthEmulator
+  User
 } from 'firebase/auth';
 import { auth } from './config';
-import NetInfo from '@react-native-community/netinfo';
 
-export const authService = {  
-  // Verificar conectividad antes de intentar login
-  checkNetworkConnection: async (): Promise<boolean> => {
-    try {
-      const netInfo = await NetInfo.fetch();
-      console.log('🌐 Estado de red:', {
-        isConnected: netInfo.isConnected,
-        type: netInfo.type,
-        isInternetReachable: netInfo.isInternetReachable
-      });
-      return netInfo.isConnected === true;
-    } catch (error) {
-      console.log('⚠️ No se pudo verificar la red, continuando...');
-      return true; // Asumir que hay conexión si no se puede verificar
-    }
-  },
-
+export const authService = {
   signIn: async (email: string, password: string) => {
     try {
-      console.log('🔐 Iniciando proceso de login...');
+      console.log('🔐 === INICIO DE LOGIN ===');
+      console.log('📧 Email:', email);
+      console.log('🔑 Firebase Project ID:', auth.app.options.projectId);
+      console.log('🌐 Auth Domain:', auth.app.options.authDomain);
+      console.log('🔧 Auth App Name:', auth.app.name);
       
-      // Verificar conexión de red
-      const isConnected = await authService.checkNetworkConnection();
-      if (!isConnected) {
-        throw new Error('Sin conexión a internet. Verifica tu conexión de red.');
-      }
-
-      console.log('📧 Intentando login con:', email);
-      console.log('🔑 Auth domain:', auth.config.authDomain);
-      
+      // Intentar el login
+      console.log('⏳ Llamando a signInWithEmailAndPassword...');
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('✅ Usuario autenticado exitosamente:', userCredential.user.email);
+      
+      console.log('✅ LOGIN EXITOSO!');
+      console.log('👤 Usuario:', userCredential.user.email);
+      console.log('🆔 UID:', userCredential.user.uid);
       
       return userCredential.user;
+      
     } catch (error: any) {
-      console.error('❌ Error completo:', error);
-      console.error('❌ Código de error:', error.code);
-      console.error('❌ Mensaje de error:', error.message);
+      console.log('❌ === ERROR EN LOGIN ===');
+      console.log('🔍 Error Code:', error.code);
+      console.log('📝 Error Message:', error.message);
+      console.log('🔧 Error Stack:', error.stack);
+      
+      // Errores más específicos
+      if (error.code === 'auth/network-request-failed') {
+        console.log('🌐 PROBLEMA DE RED DETECTADO');
+        console.log('📡 Verificando conectividad...');
+        
+        // Test de conectividad básico
+        try {
+          const response = await fetch('https://www.google.com', { 
+            method: 'HEAD'
+          });
+          console.log('🌐 Conectividad a Google:', response.ok ? 'OK' : 'FALLO');
+        } catch (netError) {
+          console.log('🌐 Sin conectividad a internet');
+        }
+        
+        // Test específico a Firebase
+        try {
+          const firebaseResponse = await fetch(`https://${auth.app.options.authDomain}`, {
+            method: 'HEAD'
+          });
+          console.log('🔥 Conectividad a Firebase:', firebaseResponse.ok ? 'OK' : 'FALLO');
+        } catch (firebaseError: any) {
+          console.log('🔥 Sin conectividad a Firebase:', firebaseError.message);
+        }
+      }
       
       throw new Error(getErrorMessage(error.code));
     }
@@ -56,7 +66,7 @@ export const authService = {
     try {
       console.log('🚪 Cerrando sesión...');
       await firebaseSignOut(auth);
-      console.log('✅ Sesión cerrada exitosamente');
+      console.log('✅ Sesión cerrada');
     } catch (error: any) {
       console.error('❌ Error al cerrar sesión:', error.message);
       throw error;
@@ -65,44 +75,24 @@ export const authService = {
 
   onAuthStateChanged: (callback: (user: User | null) => void) => {
     return onAuthStateChanged(auth, callback);
-  },
-
-  // Función para probar la conectividad con Firebase
-  testFirebaseConnection: async () => {
-    try {
-      console.log('🧪 Probando conexión con Firebase...');
-      
-      // Intentar una operación simple
-      const user = auth.currentUser;
-      console.log('👤 Usuario actual:', user?.email || 'ninguno');
-      
-      return true;
-    } catch (error: any) {
-      console.error('❌ Error de conexión con Firebase:', error);
-      return false;
-    }
   }
 };
 
 const getErrorMessage = (errorCode: string): string => {
-  console.log('🔍 Procesando error code:', errorCode);
-  
   switch (errorCode) {
     case 'auth/network-request-failed':
-      return 'Error de conexión. Verifica tu internet y vuelve a intentar.';
+      return 'Sin conexión a Firebase. Verifica tu internet.';
     case 'auth/user-not-found':
-      return 'Usuario no encontrado. Verifica tu email.';
+      return 'Usuario no encontrado.';
     case 'auth/wrong-password':
       return 'Contraseña incorrecta.';
     case 'auth/invalid-email':
       return 'Email inválido.';
     case 'auth/too-many-requests':
-      return 'Demasiados intentos fallidos. Espera unos minutos.';
-    case 'auth/user-disabled':
-      return 'Esta cuenta ha sido deshabilitada.';
+      return 'Demasiados intentos. Espera unos minutos.';
     case 'auth/invalid-credential':
-      return 'Credenciales inválidas. Verifica tu email y contraseña.';
+      return 'Credenciales inválidas.';
     default:
-      return `Error de autenticación: ${errorCode}`;
+      return `Error: ${errorCode}`;
   }
 };

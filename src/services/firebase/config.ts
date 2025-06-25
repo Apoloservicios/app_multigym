@@ -3,28 +3,39 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// ⚠️ IMPORTANTE: Necesitas completar tu API Key real
-// La que tienes está incompleta: "AIzaSyQ43uNhtAMTEb1PiQ8ld67MnrKL81axXo"
-// Debes obtener la API Key completa desde tu consola de Firebase
-
+// Configuración de Firebase (usando la configuración web que ya tienes)
 const firebaseConfig = {
-  apiKey: "AIzaSyD43uNhtAKMTEbjPtQBId67MnrKL81axXg",
+  apiKey: "AIzaSyD43uNhtAKMTEbjPtQBId67MnrKL81axXg", // ✅ Tu API Key actual
   authDomain: "sisgimnasio.firebaseapp.com",
   projectId: "sisgimnasio",
-  storageBucket: "sisgimnasio.firebasestorage.app",
-  messagingSenderId: "434544305726",
-  appId: "1:434544305726:web:676b935206eb174ecf136f",
+  storageBucket: "sisgimnasio.firebasestorage.app", 
+  messagingSenderId: "434544305726", // ✅ Tu número correcto
+  appId: "1:434544305726:web:676b935206eb174ecf136f", // ✅ Tu App ID web
   measurementId: "G-W89SRSVT3D"
 };
 
-// Verificar que la configuración está completa
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "AIzaSyD43uNhtAKMTEbjPtQBId67MnrKL81axXg") {
-  console.error('❌ FIREBASE CONFIG ERROR: API Key no configurada correctamente');
-  console.error('📋 Ve a tu consola de Firebase y obtén la API Key completa');
-}
+console.log('🔧 Inicializando Firebase con config:', {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain,
+  apiKey: firebaseConfig.apiKey.substring(0, 10) + '...' // Solo mostrar parte de la key
+});
 
+// Inicializar Firebase App
 const app = initializeApp(firebaseConfig);
+
+// Configurar Auth (versión simplificada)
 export const auth = getAuth(app);
+
+// Configurar Firestore
 export const db = getFirestore(app);
 
-console.log("🔥 Firebase inicializado correctamente");
+// Debug de conexión
+auth.onAuthStateChanged((user) => {
+  if (user) {
+    console.log('✅ Firebase Auth: Usuario conectado -', user.email);
+  } else {
+    console.log('👤 Firebase Auth: Sin usuario');
+  }
+});
+
+console.log("🔥 Firebase inicializado correctamente para React Native");
