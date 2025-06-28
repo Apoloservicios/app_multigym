@@ -12,6 +12,10 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 // Screens
 import { LoginScreen } from './src/screens/auth/LoginScreen';
 import { HomeScreen } from './src/screens/main/HomeScreen';
+import { DashboardScreen } from './src/screens/main/DashboardScreen';
+import { ProfileScreen } from './src/screens/main/ProfileScreen';
+import { RealisticDashboard } from './src/screens/main/RealisticDashboard';
+// import { MultiMembershipDashboard } from './src/screens/main/MultiMembershipDashboard';
 
 // Types
 type RootStackParamList = {
@@ -30,7 +34,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 // Pantalla de Perfil temporal
-const ProfileScreen = () => {
+const ProfileScreenTemp = () => {
   const { user, signOut } = useAuth();
   
   return (
@@ -91,7 +95,7 @@ const MainTabs = () => {
         },
       })}
     >
-      <Tab.Screen name="Inicio" component={HomeScreen} />
+      <Tab.Screen name="Inicio" component={RealisticDashboard} />
       <Tab.Screen name="Perfil" component={ProfileScreen} />
       <Tab.Screen name="Configuración" component={SettingsScreen} />
     </Tab.Navigator>

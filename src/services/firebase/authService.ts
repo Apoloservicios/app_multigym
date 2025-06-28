@@ -8,17 +8,31 @@ import {
 import { auth } from './config';
 
 export const authService = {
-  signIn: async (email: string, password: string) => {
+  signIn: async (emailOrPhone: string, password: string) => {
     try {
       console.log('🔐 === INICIO DE LOGIN ===');
-      console.log('📧 Email:', email);
+      console.log('📧 Identifier recibido:', emailOrPhone);
+      
+      // Detectar si es email o teléfono y formatear
+      let emailForAuth = emailOrPhone.trim().toLowerCase();
+      
+      // Si es solo números, convertir a formato email
+      if (/^\d+$/.test(emailForAuth)) {
+        emailForAuth = `${emailForAuth}@gymapp.local`;
+        console.log('📱 Teléfono detectado, convertido a:', emailForAuth);
+      } else if (!emailForAuth.includes('@')) {
+        // Si no tiene @ y no es solo números, agregar dominio por defecto
+        emailForAuth = `${emailForAuth}@gymapp.local`;
+        console.log('🔄 Formato convertido a:', emailForAuth);
+      }
+      
       console.log('🔑 Firebase Project ID:', auth.app.options.projectId);
       console.log('🌐 Auth Domain:', auth.app.options.authDomain);
-      console.log('🔧 Auth App Name:', auth.app.name);
+      console.log('🔧 Email final para auth:', emailForAuth);
       
       // Intentar el login
       console.log('⏳ Llamando a signInWithEmailAndPassword...');
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, emailForAuth, password);
       
       console.log('✅ LOGIN EXITOSO!');
       console.log('👤 Usuario:', userCredential.user.email);
@@ -30,32 +44,26 @@ export const authService = {
       console.log('❌ === ERROR EN LOGIN ===');
       console.log('🔍 Error Code:', error.code);
       console.log('📝 Error Message:', error.message);
-      console.log('🔧 Error Stack:', error.stack);
       
-      // Errores más específicos
+      // Errores específicos con mensajes más amigables
       if (error.code === 'auth/network-request-failed') {
         console.log('🌐 PROBLEMA DE RED DETECTADO');
-        console.log('📡 Verificando conectividad...');
-        
-        // Test de conectividad básico
-        try {
-          const response = await fetch('https://www.google.com', { 
-            method: 'HEAD'
-          });
-          console.log('🌐 Conectividad a Google:', response.ok ? 'OK' : 'FALLO');
-        } catch (netError) {
-          console.log('🌐 Sin conectividad a internet');
-        }
-        
-        // Test específico a Firebase
-        try {
-          const firebaseResponse = await fetch(`https://${auth.app.options.authDomain}`, {
-            method: 'HEAD'
-          });
-          console.log('🔥 Conectividad a Firebase:', firebaseResponse.ok ? 'OK' : 'FALLO');
-        } catch (firebaseError: any) {
-          console.log('🔥 Sin conectividad a Firebase:', firebaseError.message);
-        }
+        throw new Error('Sin conexión a Firebase. Verifica tu internet.');
+      } else if (error.code === 'auth/user-not-found') {
+        console.log('👤 Usuario no encontrado');
+        throw new Error('No se encontró una cuenta con estos datos. ¿Ya te registraste?');
+      } else if (error.code === 'auth/wrong-password') {
+        console.log('🔑 Contraseña incorrecta');
+        throw new Error('Contraseña incorrecta. Inténtalo de nuevo.');
+      } else if (error.code === 'auth/invalid-credential') {
+        console.log('🚫 Credenciales inválidas');
+        throw new Error('Email/teléfono o contraseña incorrectos.');
+      } else if (error.code === 'auth/invalid-email') {
+        console.log('📧 Email inválido');
+        throw new Error('Formato de email inválido.');
+      } else if (error.code === 'auth/too-many-requests') {
+        console.log('⏰ Demasiados intentos');
+        throw new Error('Demasiados intentos fallidos. Espera unos minutos.');
       }
       
       throw new Error(getErrorMessage(error.code));
