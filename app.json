@@ -5,40 +5,36 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#007bff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Esta app usa Face ID para autenticación segura",
-        "NSCameraUsageDescription": "Esta app necesita acceso a la cámara para tomar fotos",
-        "NSLocationWhenInUseUsageDescription": "Esta app necesita tu ubicación para funciones de check-in"
+        "NSFaceIDUsageDescription": "Esta app usa Face ID para autenticación rápida y segura durante el check-in al gimnasio.",
+        "NSFingerprintUsageDescription": "Esta app usa Touch ID para autenticación rápida y segura durante el check-in al gimnasio."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#007bff"
       },
       "permissions": [
-        "android.permission.USE_FINGERPRINT",
-        "android.permission.USE_BIOMETRIC",
-        "android.permission.CAMERA",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "USE_FINGERPRINT",
+        "USE_BIOMETRIC",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-local-authentication"
     ]
   }
 }

@@ -1,4 +1,4 @@
-// src/screens/main/RealisticDashboard.tsx
+// src/screens/main/RealisticDashboard.tsx - CONECTADO AL BACKEND REAL
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,81 +7,106 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { multiMembershipService } from '../../services/firebase/multiMembershipService';
 
-interface DashboardData {
-  userName: string;
-  membership: {
-    type: string;
-    status: 'active' | 'expired' | 'pending';
-    expiryDate: string;
-    daysRemaining: number;
-  };
-  recentAttendance: Array<{
-    date: string;
-    time: string;
-    type: 'check-in' | 'check-out';
-  }>;
-  nextPayment: {
-    amount: number;
-    dueDate: string;
-    status: 'paid' | 'pending' | 'overdue';
-    concept: string;
-  };
-  totalVisitsThisMonth: number;
+// 🆕 IMPORTAR LOS NUEVOS COMPONENTES
+import { EnhancedCheckinButton } from '../../components/checkin/EnhancedCheckinButton';
+import { QuickActionsGrid } from '../../components/checkin/QuickActionsGrid';
+
+
+import { RealDataTester } from '../../components/debug/RealDataTester';
+
+// Interfaces para los datos reales
+interface MembershipInfo {
+  id: string;
+  memberId: string;
+  gymId: string;
+  gymName: string;
+  planType: string;
+  status: 'active' | 'expired' | 'suspended';
+  startDate: any;
+  endDate: any;
+  monthlyFee: number;
+  totalDebt: number;
+}
+
+interface AttendanceRecord {
+  id: string;
+  membershipId: string;
+  date: any;
+  time: string;
+  type: 'check-in' | 'check-out';
+}
+
+interface PaymentInfo {
+  id: string;
+  membershipId: string;
+  amount: number;
+  date: any;
+  concept: string;
+  status: 'paid' | 'pending' | 'overdue';
 }
 
 export const RealisticDashboard: React.FC = () => {
   const { user, memberInfo, gymInfo } = useAuth();
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [memberships, setMemberships] = useState<MembershipInfo[]>([]);
+  const [recentAttendances, setRecentAttendances] = useState<AttendanceRecord[]>([]);
+  const [payments, setPayments] = useState<PaymentInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [thisMonthVisits, setThisMonthVisits] = useState(0);
 
-  const loadDashboardData = async () => {
+  // Función para cargar datos reales
+  const loadDashboardData = async (showRefresh = false) => {
     try {
-      if (!memberInfo || !gymInfo) {
-        setLoading(false);
+      if (!memberInfo) {
+        console.log('⚠️ memberInfo no disponible');
         return;
       }
 
-      console.log('📊 Cargando dashboard realista para:', memberInfo.firstName, memberInfo.lastName);
+      if (showRefresh) setRefreshing(true);
+      else setLoading(true);
 
-      // Simular carga breve
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Usar SOLO datos que sabemos que existen
-      const realisticData: DashboardData = {
-        userName: `${memberInfo.firstName} ${memberInfo.lastName}`,
-        membership: {
-          type: 'Membresía Básica', // Por ahora fijo
-          status: memberInfo.status === 'active' ? 'active' : 'expired',
-          expiryDate: '2025-12-31', // Fecha fija por ahora
-          daysRemaining: memberInfo.status === 'active' ? 180 : 0
-        },
-        // Asistencias de ejemplo realistas (mientras conectamos los datos reales)
-        recentAttendance: [
-          { date: '2025-06-25', time: '18:30', type: 'check-in' },
-          { date: '2025-06-23', time: '17:45', type: 'check-in' },
-          { date: '2025-06-21', time: '19:15', type: 'check-in' },
-          { date: '2025-06-19', time: '18:00', type: 'check-in' },
-          { date: '2025-06-17', time: '17:30', type: 'check-in' },
-        ],
-        nextPayment: {
-          amount: memberInfo.totalDebt || 0,
-          dueDate: '2025-07-15',
-          status: (memberInfo.totalDebt || 0) > 0 ? 'pending' : 'paid',
-          concept: 'Cuota Mensual Julio'
-        },
-        totalVisitsThisMonth: 8 // Número realista
-      };
-      
-      console.log('✅ Dashboard realista cargado');
-      setDashboardData(realisticData);
-      
+      console.log('📊 Cargando datos reales del dashboard para:', memberInfo.id);
+
+      // 1. Cargar membresías reales
+      const membershipData = await multiMembershipService.getUserMemberships(memberInfo.id);
+      console.log('✅ Membresías cargadas:', membershipData.length);
+      setMemberships(membershipData);
+
+      // 2. Cargar asistencias recientes (solo para la primera membresía activa)
+      if (membershipData.length > 0) {
+        const activeMembership = membershipData.find(m => m.status === 'active') || membershipData[0];
+        
+        const attendanceData = await multiMembershipService.getMembershipAttendance(activeMembership.id, 10);
+        console.log('✅ Asistencias cargadas:', attendanceData.length);
+        setRecentAttendances(attendanceData);
+
+        // 3. Calcular visitas del mes actual
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const thisMonthAttendances = attendanceData.filter(att => {
+          const attDate = att.date.toDate();
+          return attDate.getMonth() === currentMonth && attDate.getFullYear() === currentYear;
+        });
+        setThisMonthVisits(thisMonthAttendances.length);
+
+        // 4. Cargar pagos pendientes
+        const paymentData = await multiMembershipService.getMembershipPayments(activeMembership.id, 5);
+        console.log('✅ Pagos cargados:', paymentData.length);
+        setPayments(paymentData);
+      }
+
     } catch (error) {
-      console.error('❌ Error cargando dashboard realista:', error);
+      console.error('❌ Error cargando datos del dashboard:', error);
+      Alert.alert('Error', 'No se pudieron cargar los datos. Intenta de nuevo.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -89,188 +114,271 @@ export const RealisticDashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    loadDashboardData();
-  }, [memberInfo, gymInfo]);
+    if (memberInfo) {
+      loadDashboardData();
+    }
+  }, [memberInfo]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadDashboardData();
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#28a745';
-      case 'pending': return '#ffc107';
-      case 'expired':
-      case 'overdue': return '#dc3545';
-      default: return '#6c757d';
+  // Función para formatear fechas
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return 'Sin fecha';
+    
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('es-AR', {
+        day: 'numeric',
+        month: 'short'
+      });
+    } catch (error) {
+      return 'Fecha inválida';
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active': return 'Activa';
-      case 'pending': return 'Pendiente';
-      case 'expired': return 'Vencida';
-      case 'overdue': return 'Vencido';
-      default: return status;
+  // Función para calcular días restantes
+  const getDaysRemaining = (endDate: any) => {
+    if (!endDate) return 0;
+    
+    try {
+      const end = endDate.toDate ? endDate.toDate() : new Date(endDate);
+      const now = new Date();
+      const diffTime = end.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    } catch (error) {
+      return 0;
     }
   };
 
-  if (loading || !dashboardData) {
+  // Función para quick check-in - YA NO ES NECESARIA, MANEJADA POR EL COMPONENTE
+  // const handleQuickCheckin = async () => { ... }
+
+  if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Cargando tu información...</Text>
-        {memberInfo && (
-          <Text style={styles.loadingSubtext}>
-            Bienvenido {memberInfo.firstName}
-          </Text>
-        )}
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
+          <Text style={styles.loadingText}>Cargando tu información...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  if (!memberInfo || !gymInfo) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>No se pudieron cargar los datos del miembro</Text>
-      </View>
-    );
-  }
+  const activeMembership = memberships.find(m => m.status === 'active') || memberships[0];
+  const nextPayment = payments.find(p => p.status === 'pending') || payments[0];
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* Header de Bienvenida */}
-      <View style={styles.header}>
-        <Text style={styles.welcomeText}>¡Hola, {dashboardData.userName}!</Text>
-        <Text style={styles.gymText}>📍 {gymInfo.name}</Text>
-        <Text style={styles.dateText}>
-          {new Date().toLocaleDateString('es-ES', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </Text>
-      </View>
-
-      {/* Card de Membresía */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="card" size={24} color="#007bff" />
-          <Text style={styles.cardTitle}>Mi Membresía</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadDashboardData(true)}
+            colors={['#007bff']}
+          />
+        }
+      >
+        {/* Header con saludo personalizado */}
+        <View style={styles.header}>
+          <View style={styles.greeting}>
+            <Text style={styles.greetingText}>
+              ¡Hola, {memberInfo?.firstName || 'Usuario'}!
+            </Text>
+            <Text style={styles.gymName}>
+              📍 {gymInfo?.name || 'Tu Gimnasio'}
+            </Text>
+          </View>
+          
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={24} color="#007bff" />
+          </TouchableOpacity>
         </View>
-        <View style={styles.membershipInfo}>
-          <Text style={styles.membershipType}>{dashboardData.membership.type}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(dashboardData.membership.status) }]}>
-            <Text style={styles.statusText}>{getStatusText(dashboardData.membership.status)}</Text>
+
+        {/* Cards de estadísticas principales */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Ionicons name="fitness-outline" size={24} color="#28a745" />
+            <Text style={styles.statNumber}>{thisMonthVisits}</Text>
+            <Text style={styles.statLabel}>Este mes</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Ionicons name="calendar-outline" size={24} color="#007bff" />
+            <Text style={styles.statNumber}>{recentAttendances.length}</Text>
+            <Text style={styles.statLabel}>Esta semana</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Ionicons name="time-outline" size={24} color="#ffc107" />
+            <Text style={styles.statNumber}>
+              {recentAttendances.length > 0 ? recentAttendances[0].time : '00:00'}
+            </Text>
+            <Text style={styles.statLabel}>Última visita</Text>
           </View>
         </View>
-        <Text style={styles.expiryText}>
-          Vence: {new Date(dashboardData.membership.expiryDate).toLocaleDateString('es-ES')}
-        </Text>
-        <Text style={styles.daysRemaining}>
-          {dashboardData.membership.daysRemaining} días restantes
-        </Text>
-      </View>
 
-      {/* Stats Rápidas */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Ionicons name="fitness" size={32} color="#28a745" />
-          <Text style={styles.statNumber}>{dashboardData.totalVisitsThisMonth}</Text>
-          <Text style={styles.statLabel}>Visitas este mes</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="time" size={32} color="#007bff" />
-          <Text style={styles.statNumber}>
-            {dashboardData.recentAttendance.length > 0 ? 
-              dashboardData.recentAttendance[0].time : 
-              '--:--'
-            }
-          </Text>
-          <Text style={styles.statLabel}>Última visita</Text>
-        </View>
-      </View>
+        {/* Botón de Check-in Rápido - REEMPLAZADO POR COMPONENTE MEJORADO */}
+        <EnhancedCheckinButton 
+          onCheckinSuccess={() => loadDashboardData(true)}
+          onCheckinError={(error) => console.error('Check-in error:', error)}
+        />
 
-      {/* Próximo Pago */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="wallet" size={24} color="#ffc107" />
-          <Text style={styles.cardTitle}>Estado de Pagos</Text>
-        </View>
-        <Text style={styles.paymentConcept}>{dashboardData.nextPayment.concept}</Text>
-        <Text style={styles.paymentAmount}>${dashboardData.nextPayment.amount.toLocaleString('es-AR')}</Text>
-        <Text style={styles.paymentDate}>
-          {dashboardData.nextPayment.amount > 0 ? 
-            `Vence: ${new Date(dashboardData.nextPayment.dueDate).toLocaleDateString('es-ES')}` :
-            'Sin deudas pendientes'
-          }
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(dashboardData.nextPayment.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(dashboardData.nextPayment.status)}</Text>
-        </View>
-      </View>
-
-      {/* Asistencias Recientes */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Ionicons name="list" size={24} color="#28a745" />
-          <Text style={styles.cardTitle}>Asistencias Recientes</Text>
-        </View>
-        {dashboardData.recentAttendance.map((attendance, index) => (
-          <View key={index} style={styles.attendanceItem}>
-            <View style={styles.attendanceDate}>
-              <Text style={styles.attendanceDateText}>
-                {new Date(attendance.date).toLocaleDateString('es-ES', { 
-                  month: 'short', 
-                  day: 'numeric' 
-                })}
-              </Text>
+        {/* Información de Membresía */}
+        {activeMembership && (
+          <View style={styles.membershipCard}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="card-outline" size={24} color="#007bff" />
+              <Text style={styles.cardTitle}>Mi Membresía</Text>
             </View>
-            <View style={styles.attendanceDetails}>
-              <Text style={styles.attendanceTime}>{attendance.time}</Text>
-              <Text style={styles.attendanceType}>
-                {attendance.type === 'check-in' ? 'Entrada' : 'Salida'}
-              </Text>
+            
+            <View style={styles.membershipInfo}>
+              <View style={styles.membershipRow}>
+                <Text style={styles.membershipLabel}>{activeMembership.planType}</Text>
+                <View style={[
+                  styles.statusBadge, 
+                  { backgroundColor: activeMembership.status === 'active' ? '#28a745' : '#dc3545' }
+                ]}>
+                  <Text style={styles.statusText}>
+                    {activeMembership.status === 'active' ? 'Activa' : 'Vencida'}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.membershipDetails}>
+                <Text style={styles.membershipExpiry}>
+                  Vence: {formatDate(activeMembership.endDate)}
+                </Text>
+                <Text style={styles.daysRemaining}>
+                  {getDaysRemaining(activeMembership.endDate)} días restantes
+                </Text>
+                <Text style={styles.membershipSince}>
+                  Miembro desde: {formatDate(activeMembership.startDate)}
+                </Text>
+              </View>
             </View>
-            <Ionicons 
-              name={attendance.type === 'check-in' ? 'enter' : 'exit'} 
-              size={20} 
-              color="#007bff" 
-            />
           </View>
-        ))}
-      </View>
+        )}
 
-      {/* Acciones Rápidas */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="qr-code" size={24} color="#fff" />
-          <Text style={styles.actionText}>Check-in</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="barbell" size={24} color="#fff" />
-          <Text style={styles.actionText}>Rutinas</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="calendar" size={24} color="#fff" />
-          <Text style={styles.actionText}>Clases</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Estado Financiero */}
+        {nextPayment && (
+          <View style={styles.financialCard}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="wallet-outline" size={24} color="#ffc107" />
+              <Text style={styles.cardTitle}>Estado Financiero</Text>
+            </View>
+            
+            <View style={styles.financialInfo}>
+              <View style={styles.financialRow}>
+                <Text style={styles.financialLabel}>Cuota Mensual</Text>
+                <Text style={styles.financialAmount}>
+                  ${activeMembership?.monthlyFee?.toLocaleString() || '0'}
+                </Text>
+              </View>
+              
+              <View style={styles.financialRow}>
+                <Text style={styles.financialLabel}>Vence</Text>
+                <Text style={styles.financialDate}>
+                  {formatDate(nextPayment.date)}
+                </Text>
+              </View>
+              
+              {activeMembership?.totalDebt > 0 && (
+                <View style={[styles.financialRow, styles.debtRow]}>
+                  <Text style={styles.debtLabel}>Deuda pendiente</Text>
+                  <Text style={styles.debtAmount}>
+                    ${activeMembership.totalDebt.toLocaleString()}
+                  </Text>
+                </View>
+              )}
+              
+              <View style={styles.paymentStatus}>
+                <View style={[
+                  styles.paymentBadge,
+                  { backgroundColor: nextPayment.status === 'paid' ? '#28a745' : '#ffc107' }
+                ]}>
+                  <Text style={styles.paymentText}>
+                    {nextPayment.status === 'paid' ? 'Pagado' : 'Pendiente'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
 
-      <View style={styles.bottomSpacing} />
-    </ScrollView>
+        {/* Asistencias Recientes */}
+        <View style={styles.attendanceCard}>
+          <View style={styles.cardHeader}>
+            <Ionicons name="list-outline" size={24} color="#6f42c1" />
+            <Text style={styles.cardTitle}>Asistencias Recientes</Text>
+          </View>
+          
+          {recentAttendances.length > 0 ? (
+            <View style={styles.attendanceList}>
+              {recentAttendances.slice(0, 5).map((attendance, index) => (
+                <View key={attendance.id || index} style={styles.attendanceItem}>
+                  <View style={styles.attendanceLeft}>
+                    <Text style={styles.attendanceDate}>
+                      {formatDate(attendance.date)}
+                    </Text>
+                    <Text style={styles.attendanceTime}>
+                      {attendance.time}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.attendanceRight}>
+                    <Text style={styles.attendanceType}>
+                      {attendance.type === 'check-in' ? 'Entrada' : 'Salida'}
+                    </Text>
+                    <Ionicons 
+                      name="checkmark-circle" 
+                      size={20} 
+                      color="#28a745" 
+                    />
+                  </View>
+                </View>
+              ))}
+              
+              <TouchableOpacity style={styles.viewAllButton}>
+                <Text style={styles.viewAllText}>Ver todas las asistencias</Text>
+                <Ionicons name="chevron-forward" size={16} color="#007bff" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={48} color="#6c757d" />
+              <Text style={styles.emptyText}>Sin asistencias registradas</Text>
+              <Text style={styles.emptySubtext}>
+                Tu primera visita aparecerá aquí
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Accesos rápidos - NUEVO COMPONENTE */}
+        <QuickActionsGrid 
+          onNavigateToRoutines={() => Alert.alert('Rutinas', 'Navegar a la pestaña Rutinas')}
+          onNavigateToAttendance={() => Alert.alert('Asistencias', 'Navegar a la pestaña Asistencias')}
+          onNavigateToPayments={() => Alert.alert('Pagos', 'Funcionalidad de pagos próximamente')}
+          onOpenSupport={() => Alert.alert('Soporte', 'Contacta al gimnasio para ayuda')}
+        />
+
+        {/* Espacio inferior para el tab navigator */}
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+      
+            {/* TEMPORAL - SOLO PARA TESTING */}
+      <RealDataTester />
+    </SafeAreaView>
+    
   );
 };
 
-// Usar los mismos estilos del DashboardScreen original
+// 🎨 ESTILOS COMPLETOS
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#007bff',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
@@ -279,49 +387,143 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f8f9fa',
   },
   loadingText: {
+    marginTop: 15,
     fontSize: 16,
     color: '#6c757d',
-    marginTop: 10,
+    fontWeight: '500',
   },
-  loadingSubtext: {
-    fontSize: 14,
-    color: '#007bff',
-    marginTop: 5,
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#dc3545',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
+  
+  // Header styles
   header: {
-    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
     backgroundColor: '#007bff',
   },
-  welcomeText: {
+  greeting: {
+    flex: 1,
+  },
+  greetingText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5,
+    color: '#ffffff',
+    marginBottom: 4,
   },
-  gymText: {
+  gymName: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 5,
+    color: '#cce7ff',
   },
-  dateText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    textTransform: 'capitalize',
+  notificationButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  card: {
-    backgroundColor: '#fff',
-    marginHorizontal: 15,
-    marginVertical: 8,
+  
+  // Stats container
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: '#007bff',
+    paddingBottom: 30,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     padding: 15,
     borderRadius: 12,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginVertical: 5,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#cce7ff',
+    textAlign: 'center',
+  },
+  
+  // Check-in button - YA NO NECESARIO, MANEJADO POR COMPONENTE
+  /*
+  checkinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#28a745',
+    marginHorizontal: 20,
+    marginTop: -15,
+    marginBottom: 20,
+    paddingVertical: 15,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  checkinText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  */
+  
+  // Card styles
+  membershipCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  financialCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  attendanceCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  quickActionsCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -336,19 +538,24 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 10,
     color: '#212529',
+    marginLeft: 10,
   },
+  
+  // Membership styles
   membershipInfo: {
+    marginTop: 10,
+  },
+  membershipRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
   },
-  membershipType: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#007bff',
+  membershipLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -356,123 +563,179 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  expiryText: {
-    fontSize: 14,
-    color: '#6c757d',
+  membershipDetails: {
+    marginTop: 10,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  membershipExpiry: {
+    fontSize: 16,
+    color: '#212529',
     marginBottom: 5,
   },
   daysRemaining: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
     color: '#28a745',
+    fontWeight: '600',
+    marginBottom: 10,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 15,
-    marginVertical: 8,
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginTop: 5,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  paymentConcept: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#212529',
-    marginBottom: 8,
-  },
-  paymentAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007bff',
-    marginBottom: 8,
-  },
-  paymentDate: {
+  membershipSince: {
     fontSize: 14,
     color: '#6c757d',
-    marginBottom: 10,
+  },
+  
+  // Financial styles
+  financialInfo: {
+    marginTop: 10,
+  },
+  financialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  financialLabel: {
+    fontSize: 16,
+    color: '#212529',
+  },
+  financialAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#212529',
+  },
+  financialDate: {
+    fontSize: 16,
+    color: '#6c757d',
+  },
+  debtRow: {
+    backgroundColor: '#fff3cd',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginVertical: 5,
+  },
+  debtLabel: {
+    fontSize: 16,
+    color: '#856404',
+    fontWeight: '600',
+  },
+  debtAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
+  },
+  paymentStatus: {
+    alignItems: 'flex-end',
+    marginTop: 10,
+  },
+  paymentBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  paymentText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  
+  // Attendance styles
+  attendanceList: {
+    marginTop: 10,
   },
   attendanceItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#f1f3f4',
+  },
+  attendanceLeft: {
+    flex: 1,
   },
   attendanceDate: {
-    width: 60,
-    alignItems: 'center',
-  },
-  attendanceDateText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#007bff',
-    textTransform: 'uppercase',
-  },
-  attendanceDetails: {
-    flex: 1,
-    marginLeft: 15,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
   },
   attendanceTime: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212529',
+    fontSize: 14,
+    color: '#6c757d',
+    marginTop: 2,
+  },
+  attendanceRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   attendanceType: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#007bff',
+    fontWeight: '500',
+    marginRight: 8,
   },
-  actionsContainer: {
+  viewAllButton: {
     flexDirection: 'row',
-    marginHorizontal: 15,
-    marginVertical: 8,
-    gap: 10,
-    marginBottom: 30,
-  },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#007bff',
-    padding: 15,
-    borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'center',
+    paddingVertical: 12,
+    marginTop: 10,
   },
-  actionText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+  viewAllText: {
+    fontSize: 16,
+    color: '#007bff',
+    fontWeight: '500',
+    marginRight: 5,
+  },
+  
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#6c757d',
+    fontWeight: '500',
+    marginTop: 15,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#9ca3af',
     marginTop: 5,
   },
-  bottomSpacing: {
-    height: 30,
+  
+  // Quick actions
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 15,
+  },
+  actionButton: {
+    width: '22%',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  actionText: {
+    fontSize: 12,
+    color: '#212529',
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  
+  // Bottom space for tab navigator
+  bottomSpace: {
+    height: Platform.OS === 'ios' ? 90 : 70,
   },
 });
