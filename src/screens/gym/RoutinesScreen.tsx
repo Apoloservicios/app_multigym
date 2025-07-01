@@ -1,4 +1,4 @@
-// src/screens/gym/RoutinesScreen.tsx
+// src/screens/gym/RoutinesScreen.tsx - FIX ERROR TYPESCRIPT
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -31,12 +31,17 @@ export const RoutinesScreen: React.FC = () => {
       if (showRefresh) setRefreshing(true);
       else setLoading(true);
 
+      // 🔧 FIX: Agregar debug primero
+      await multiMembershipService.debugRoutineStructure(memberInfo.id, gymInfo.id);
+
       const routineData = await multiMembershipService.getUserRoutines(memberInfo.id, gymInfo.id);
       setRoutines(routineData);
 
     } catch (error) {
       console.error('❌ Error cargando rutinas:', error);
-      Alert.alert('Error', 'No se pudieron cargar las rutinas');
+      // 🔧 FIX: Manejar error como unknown
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      Alert.alert('Error', `No se pudieron cargar las rutinas: ${errorMessage}`);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,9 +83,9 @@ export const RoutinesScreen: React.FC = () => {
         
         {exercises.map((exercise, index) => (
           <View key={index} style={styles.exerciseItem}>
-            <Text style={styles.exerciseName}>{exercise.name}</Text>
+            <Text style={styles.exerciseName}>{exercise.name || exercise.exerciseName || 'Ejercicio'}</Text>
             <Text style={styles.exerciseDetails}>
-              {exercise.sets} series × {exercise.reps} repeticiones
+              {exercise.sets || 3} series × {exercise.reps || '12'} repeticiones
               {exercise.weight && ` • ${exercise.weight}kg`}
               {exercise.rest && ` • Descanso: ${exercise.rest}s`}
             </Text>
@@ -242,6 +247,7 @@ export const RoutinesScreen: React.FC = () => {
   );
 };
 
+// Mantener todos los estilos igual que tenías
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

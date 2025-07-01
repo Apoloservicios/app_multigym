@@ -12,9 +12,7 @@ export default {
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
-    assetBundlePatterns: [
-      "**/*"
-    ],
+    assetBundlePatterns: ["**/*"],
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.sisgimnasio.gymapp"
@@ -28,6 +26,11 @@ export default {
     },
     web: {
       favicon: "./assets/favicon.png"
+    },
+    extra: {
+      eas: {
+        projectId: "26d5b552-2762-4701-b7d8-778ab2101a70"
+      }
     }
   }
 };
