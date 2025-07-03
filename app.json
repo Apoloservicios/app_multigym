@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "GymApp",
-    "slug": "gym-app",
+    "name": "GymApp SisGimnasio",
+    "slug": "gymapp-sisgimnasio",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,32 +9,43 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#007bff"
+      "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSFaceIDUsageDescription": "Esta app usa Face ID para autenticación rápida y segura durante el check-in al gimnasio.",
-        "NSFingerprintUsageDescription": "Esta app usa Touch ID para autenticación rápida y segura durante el check-in al gimnasio."
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#007bff"
+        "backgroundColor": "#ffffff"
       },
+      "package": "com.aptincho.gymappsisgimnasio",
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
       "permissions": [
         "USE_FINGERPRINT",
-        "USE_BIOMETRIC",
-        "android.permission.CAMERA"
+        "USE_BIOMETRIC_AUTHENTICATION",
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-local-authentication"
+      "expo-local-authentication",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ]
   }
 }
