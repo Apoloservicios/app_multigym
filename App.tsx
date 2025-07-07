@@ -1,4 +1,4 @@
-// App.tsx - NAVEGACIÓN COMPLETA CON TODAS LAS PANTALLAS
+// App.tsx - VERSIÓN COMPLETA PERO ESTABLE
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -11,14 +11,15 @@ import {
   Text, 
   TouchableOpacity,
   StatusBar,
-  Platform 
+  Platform,
+  Alert 
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-// Context
+// Context con error boundary
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 
-// Screens
+// Screens principales
 import { LoginScreen } from './src/screens/auth/LoginScreen';
 import { RealisticDashboard } from './src/screens/main/RealisticDashboard';
 import { ProfileScreen } from './src/screens/main/ProfileScreen';
@@ -45,6 +46,50 @@ type MainTabParamList = {
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+// 🛡️ Error Boundary Component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('❌ App Error Boundary:', error);
+    console.error('❌ Error Info:', errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.errorContainer}>
+            <Ionicons name="warning" size={48} color="#dc3545" />
+            <Text style={styles.errorTitle}>Error en la aplicación</Text>
+            <Text style={styles.errorMessage}>
+              {this.state.error?.message || 'Error desconocido'}
+            </Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={() => this.setState({ hasError: false, error: undefined })}
+            >
+              <Text style={styles.retryButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
+        </SafeAreaProvider>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // 🛡️ COMPONENTE WRAPPER PARA SAFE AREA
 const SafeWrapper: React.FC<{ children: React.ReactNode; backgroundColor?: string }> = ({ 
   children, 
@@ -64,7 +109,7 @@ const SafeWrapper: React.FC<{ children: React.ReactNode; backgroundColor?: strin
   );
 };
 
-// 💰 Pantalla de Pagos (nueva funcionalidad)
+// 💰 Pantalla de Pagos (simplificada para estabilidad)
 const PaymentsScreen = () => {
   const { memberInfo, gymInfo } = useAuth();
   
@@ -76,11 +121,16 @@ const PaymentsScreen = () => {
         
         <View style={styles.paymentCard}>
           <Text style={styles.paymentTitle}>Próximo Vencimiento</Text>
-          <Text style={styles.paymentAmount}>$60.000</Text>
+          <Text style={styles.paymentAmount}>
+            ${memberInfo?.totalDebt?.toLocaleString() || '0'}
+          </Text>
           <Text style={styles.paymentDate}>Vence: 14/07/2025</Text>
           
-          <TouchableOpacity style={styles.payButton}>
-            <Text style={styles.payButtonText}>Pagar Ahora</Text>
+          <TouchableOpacity 
+            style={styles.payButton}
+            onPress={() => Alert.alert('Pagos', 'Funcionalidad próximamente')}
+          >
+            <Text style={styles.payButtonText}>Ver Detalles</Text>
           </TouchableOpacity>
         </View>
         
@@ -159,9 +209,28 @@ const NotificationsScreen = () => {
   );
 };
 
-// ⚙️ Pantalla de Configuración Mejorada
+// ⚙️ Pantalla de Configuración
 const SettingsScreen = () => {
   const { signOut, memberInfo } = useAuth();
+  
+  const handleSignOut = async () => {
+    try {
+      Alert.alert(
+        'Cerrar Sesión',
+        '¿Estás seguro que quieres cerrar sesión?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { 
+            text: 'Cerrar Sesión', 
+            style: 'destructive', 
+            onPress: () => signOut() 
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo cerrar la sesión');
+    }
+  };
   
   return (
     <SafeWrapper backgroundColor="#495057">
@@ -170,13 +239,19 @@ const SettingsScreen = () => {
         
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Cuenta</Text>
-          <TouchableOpacity style={styles.settingOption}>
+          <TouchableOpacity 
+            style={styles.settingOption}
+            onPress={() => Alert.alert('Perfil', 'Funcionalidad próximamente')}
+          >
             <Ionicons name="person-outline" size={24} color="#007bff" />
             <Text style={styles.settingText}>Editar Perfil</Text>
             <Ionicons name="chevron-forward" size={20} color="#6c757d" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingOption}>
+          <TouchableOpacity 
+            style={styles.settingOption}
+            onPress={() => Alert.alert('Contraseña', 'Funcionalidad próximamente')}
+          >
             <Ionicons name="key-outline" size={24} color="#007bff" />
             <Text style={styles.settingText}>Cambiar Contraseña</Text>
             <Ionicons name="chevron-forward" size={20} color="#6c757d" />
@@ -185,13 +260,19 @@ const SettingsScreen = () => {
         
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Preferencias</Text>
-          <TouchableOpacity style={styles.settingOption}>
+          <TouchableOpacity 
+            style={styles.settingOption}
+            onPress={() => Alert.alert('Notificaciones', 'Funcionalidad próximamente')}
+          >
             <Ionicons name="notifications-outline" size={24} color="#007bff" />
             <Text style={styles.settingText}>Notificaciones</Text>
             <Ionicons name="chevron-forward" size={20} color="#6c757d" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingOption}>
+          <TouchableOpacity 
+            style={styles.settingOption}
+            onPress={() => Alert.alert('Tema', 'Funcionalidad próximamente')}
+          >
             <Ionicons name="moon-outline" size={24} color="#007bff" />
             <Text style={styles.settingText}>Tema Oscuro</Text>
             <View style={styles.toggle}>
@@ -208,21 +289,21 @@ const SettingsScreen = () => {
         
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Soporte</Text>
-          <TouchableOpacity style={styles.settingOption}>
+          <TouchableOpacity 
+            style={styles.settingOption}
+            onPress={() => Alert.alert('Ayuda', 'Contacta al gimnasio para soporte')}
+          >
             <Ionicons name="help-circle-outline" size={24} color="#007bff" />
             <Text style={styles.settingText}>Centro de Ayuda</Text>
             <Ionicons name="chevron-forward" size={20} color="#6c757d" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.settingOption}>
+          <TouchableOpacity 
+            style={styles.settingOption}
+            onPress={() => Alert.alert('Soporte', 'Contacta al gimnasio directamente')}
+          >
             <Ionicons name="mail-outline" size={24} color="#007bff" />
             <Text style={styles.settingText}>Contactar Soporte</Text>
-            <Ionicons name="chevron-forward" size={20} color="#6c757d" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingOption}>
-            <Ionicons name="document-text-outline" size={24} color="#007bff" />
-            <Text style={styles.settingText}>Términos y Condiciones</Text>
             <Ionicons name="chevron-forward" size={20} color="#6c757d" />
           </TouchableOpacity>
         </View>
@@ -232,7 +313,7 @@ const SettingsScreen = () => {
           <Text style={styles.appBuild}>Build: {memberInfo?.id?.substring(0, 8) || 'xxxxxxxx'}</Text>
         </View>
         
-        <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
           <Ionicons name="log-out-outline" size={20} color="#fff" />
           <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
         </TouchableOpacity>
@@ -243,14 +324,14 @@ const SettingsScreen = () => {
 
 // 👤 Pantalla de Perfil Mejorada
 const ProfileScreenEnhanced = () => {
-  const { user, memberInfo, gymInfo, signOut } = useAuth();
+  const { user, memberInfo, gymInfo } = useAuth();
   
   return (
     <SafeWrapper backgroundColor="#6c757d">
       <View style={styles.screenContainer}>
         <Text style={styles.title}>👤 Mi Perfil</Text>
         
-        {memberInfo && (
+        {memberInfo ? (
           <View style={styles.profileCard}>
             <View style={styles.profileAvatar}>
               <Text style={styles.profileInitials}>
@@ -265,6 +346,10 @@ const ProfileScreenEnhanced = () => {
             {gymInfo && (
               <Text style={styles.profileGym}>🏢 {gymInfo.name}</Text>
             )}
+          </View>
+        ) : (
+          <View style={styles.profileCard}>
+            <Text style={styles.profileName}>Cargando perfil...</Text>
           </View>
         )}
         
@@ -296,12 +381,18 @@ const ProfileScreenEnhanced = () => {
         </View>
         
         <View style={styles.profileActions}>
-          <TouchableOpacity style={styles.profileAction}>
+          <TouchableOpacity 
+            style={styles.profileAction}
+            onPress={() => Alert.alert('Editar', 'Funcionalidad próximamente')}
+          >
             <Ionicons name="create-outline" size={20} color="#007bff" />
             <Text style={styles.profileActionText}>Editar Perfil</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.profileAction}>
+          <TouchableOpacity 
+            style={styles.profileAction}
+            onPress={() => Alert.alert('Compartir', 'Funcionalidad próximamente')}
+          >
             <Ionicons name="share-outline" size={20} color="#007bff" />
             <Text style={styles.profileActionText}>Compartir Logros</Text>
           </TouchableOpacity>
@@ -360,7 +451,7 @@ const MainTabs = () => {
   );
 };
 
-// Navegador de autenticación
+// Navegador de autenticación con manejo de errores
 const AuthNavigator = () => {
   const { user, loading } = useAuth();
   
@@ -369,7 +460,7 @@ const AuthNavigator = () => {
       <SafeWrapper>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007bff" />
-          <Text style={styles.loadingText}>Cargando...</Text>
+          <Text style={styles.loadingText}>Cargando GymApp...</Text>
         </View>
       </SafeWrapper>
     );
@@ -386,20 +477,22 @@ const AuthNavigator = () => {
   );
 };
 
-// Componente principal de la App
+// Componente principal de la App con Error Boundary
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <AuthNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <AuthNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 
-// 🎨 ESTILOS COMPLETOS
+// 🎨 ESTILOS COMPLETOS (manteniendo todos los originales)
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -415,6 +508,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6c757d',
     fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#dc3545',
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   screenContainer: {
     flex: 1,
@@ -768,4 +891,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
-});
+  });
